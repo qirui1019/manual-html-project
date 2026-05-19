@@ -29,33 +29,33 @@ class ConvertConfig:
     output_dir: Path
     image_map_file: Path
     css_file: Path
-    overwrite: bool = False
+    overwrite: bool
 
 
 def parse_args() -> ConvertConfig:
     parser = argparse.ArgumentParser(description="批量将产品说明书 YAML 转换为 HTML。")
     parser.add_argument(
         "--input-dir",
-        default=ROOT_DIR / "input_yaml",
         type=Path,
+        default=ROOT_DIR / "input_yaml",
         help="YAML 输入目录，默认：input_yaml/",
     )
     parser.add_argument(
         "--output-dir",
-        default=ROOT_DIR / "output",
         type=Path,
+        default=ROOT_DIR / "output",
         help="HTML 输出目录，默认：output/",
     )
     parser.add_argument(
         "--image-map",
-        default=ROOT_DIR / "image-map.json",
         type=Path,
+        default=ROOT_DIR / "image-map.json",
         help="图片映射 JSON 文件，默认：image-map.json",
     )
     parser.add_argument(
         "--css",
-        default=ROOT_DIR / "styles.css",
         type=Path,
+        default=ROOT_DIR / "styles.css",
         help="生成 HTML 引用的 CSS 文件，默认：styles.css",
     )
     parser.add_argument(
@@ -63,7 +63,7 @@ def parse_args() -> ConvertConfig:
         "--force",
         action="store_true",
         dest="overwrite",
-        help="当输出 HTML 已存在时强制覆盖；默认跳过已有文件。",
+        help="输出 HTML 已存在时强制覆盖；默认跳过已有文件。",
     )
     args = parser.parse_args()
 
@@ -78,14 +78,14 @@ def parse_args() -> ConvertConfig:
 
 def load_json(path: Path) -> dict[str, Any]:
     if not path.exists():
-        print(f"未找到图片映射文件：{path}，将全部使用空映射。", file=sys.stderr)
+        print(f"未找到图片映射文件：{path}，将使用空映射。", file=sys.stderr)
         return {}
 
     with path.open("r", encoding="utf-8") as file:
         data = json.load(file)
 
     if not isinstance(data, dict):
-        print(f"图片映射文件顶层不是对象：{path}，将全部使用空映射。", file=sys.stderr)
+        print(f"图片映射文件顶层不是对象：{path}，将使用空映射。", file=sys.stderr)
         return {}
 
     return data
@@ -104,13 +104,14 @@ def to_list(value: Any) -> list[Any]:
     return [value]
 
 
-def text(value: Any) -> str:
+def clean_text(value: Any) -> str:
     if value is None:
         return ""
     return str(value).strip()
 
 
 def extract_pages(data: Any) -> tuple[str, list[dict[str, Any]]]:
+    """支持常见结构：顶层列表，或“说明书标题: [页面...]”形式。"""
     if isinstance(data, list):
         return "产品说明书页面结构", [item for item in data if isinstance(item, dict)]
 
@@ -128,27 +129,58 @@ def extract_pages(data: Any) -> tuple[str, list[dict[str, Any]]]:
 
 
 def html_relpath(target: Path, html_file: Path) -> str:
-    try:
-        return Path(os.path.relpath(target, html_file.parent)).as_posix()
-    except ValueError:
-        return target.as_posix()
+    return Path(os.path.relpath(target, html_file.parent)).as_posix()
 
 
-def resolve_asset(asset: str, project_root: Path) -> Path:
-    raw = Path(asset.replace("\\", "/"))
-    candidate = raw if raw.is_absolute() else project_root / raw
+def normalize_repo_asset_path(asset_path: str) -> str:
+    normalized = asset_path.strip().replace("\\", "/")
 
-    if candidate.exists():
-        return candidate
+    if normalized.startswith(("http://", "https://", "data:", "#")):
+        return normalized
 
-    parent = candidate.parent
-    if parent.exists():
-        target_name = candidate.name.lower()
-        for child in parent.iterdir():
-            if child.name.lower() == target_name:
-                return child
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
 
-    return candidate
+    # image-map.json 中的 /images/... 也按仓库根目录路径处理。
+    return normalized.lstrip("/")
+
+
+def resolve_case_insensitive(path: Path) -> Path:
+    """Windows 本地可打开小写 .png，但 GitHub Pages 区分大小写；这里修正为真实文件名。"""
+    if path.is_absolute():
+        try:
+            relative_path = path.relative_to(ROOT_DIR)
+            current = ROOT_DIR
+            parts = relative_path.parts
+        except ValueError:
+            current = path.parent
+            parts = (path.name,)
+    else:
+        current = Path()
+        parts = path.parts
+
+    for part in parts:
+        if current.exists() and current.is_dir():
+            lower_part = part.lower()
+            match = next((child for child in current.iterdir() if child.name.lower() == lower_part), None)
+            if match is not None:
+                current = match
+                continue
+
+        candidate = current / part
+        current = candidate
+
+    return current
+
+
+def asset_src(asset_path: str, html_file: Path, project_root: Path) -> str:
+    normalized = normalize_repo_asset_path(asset_path)
+
+    if normalized.startswith(("http://", "https://", "data:", "#")):
+        return normalized
+
+    absolute_asset = resolve_case_insensitive(project_root / normalized)
+    return html_relpath(absolute_asset, html_file)
 
 
 def image_map_for_file(image_map: dict[str, Any], yaml_file: Path) -> dict[str, Any]:
@@ -160,7 +192,7 @@ def image_map_for_file(image_map: dict[str, Any], yaml_file: Path) -> dict[str, 
 
 
 def default_images(image_map: dict[str, Any]) -> list[str]:
-    return [text(item) for item in to_list(image_map.get("default")) if text(item)]
+    return [clean_text(item) for item in to_list(image_map.get("default")) if clean_text(item)]
 
 
 def images_for_page(
@@ -170,14 +202,14 @@ def images_for_page(
 ) -> tuple[list[str], bool]:
     page_map = image_map_for_file(image_map, yaml_file)
     mapped_images = page_map.get(page_name)
+
     if mapped_images is None:
         for key, value in page_map.items():
-            if text(key) == page_name:
+            if clean_text(key) == page_name:
                 mapped_images = value
                 break
 
-    images = [text(item) for item in to_list(mapped_images) if text(item)]
-
+    images = [clean_text(item) for item in to_list(mapped_images) if clean_text(item)]
     if images:
         return images, False
 
@@ -226,8 +258,8 @@ def render_elements(elements: Any) -> str:
 
     for index, element in enumerate(to_list(elements), start=1):
         if isinstance(element, dict):
-            element_name = text(element.get("元素名称")) or f"元素 {index}"
-            element_type = text(element.get("元素类型"))
+            element_name = clean_text(element.get("元素名称")) or f"元素 {index}"
+            element_type = clean_text(element.get("元素类型"))
             type_pill = f'<span class="type-pill">{escape(element_type)}</span>' if element_type else ""
             fields = render_meta_list(element)
             items.append(
@@ -259,8 +291,8 @@ def render_modules(modules: Any) -> str:
 
     for index, module in enumerate(to_list(modules), start=1):
         if isinstance(module, dict):
-            module_name = text(module.get("模块名称")) or f"模块 {index}"
-            module_type = text(module.get("模块类型"))
+            module_name = clean_text(module.get("模块名称")) or f"模块 {index}"
+            module_type = clean_text(module.get("模块类型"))
             type_pill = f'<span class="type-pill">{escape(module_type)}</span>' if module_type else ""
             module_meta = render_meta_list(module, skip_keys={ELEMENTS_KEY})
             elements = render_elements(module.get(ELEMENTS_KEY))
@@ -296,7 +328,7 @@ def render_images(
 
     figures: list[str] = []
     for image in images:
-        source = html_relpath(resolve_asset(image, project_root), html_file)
+        source = asset_src(image, html_file, project_root)
         classes = "image-card is-placeholder" if is_default else "image-card"
         alt = "default placeholder" if is_default else Path(image).name
         figures.append(
@@ -317,7 +349,7 @@ def render_page(
     index: int,
     project_root: Path,
 ) -> str:
-    page_name = text(page.get(PAGE_NAME_KEY)) or f"页面 {index}"
+    page_name = clean_text(page.get(PAGE_NAME_KEY)) or f"页面 {index}"
     images, is_default = images_for_page(image_map, yaml_file, page_name)
     badge_text = "default" if is_default else f"{len(images)} 张图"
     page_meta = render_meta_list(page, skip_keys={MODULES_KEY})
