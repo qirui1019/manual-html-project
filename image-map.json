@@ -1,0 +1,24 @@
+{
+  "SEESII_general": {
+    "封面": ["images/SEESII_general/page_1_cover.png"],
+    "目录": ["images/SEESII_general/page_2_catalog.png"],
+    "安全警告": ["images/SEESII_general/page_3_ch1_1.png"],  
+    "功能说明与规格参数": [
+      "images/SEESII_general/page_4_ch2_1.png",
+      "images/SEESII_general/page_4_ch2_2.png"
+    ],
+    "操作指南":[
+      "images/SEESII_general/page_5_ch3_1.png",
+      "images/SEESII_general/page_5_ch3_2.png",
+      "images/SEESII_general/page_5_ch3_3.png",
+      "images/SEESII_general/page_5_ch3_4.png"
+    ],
+    "维护保养":["images/SEESII_general/page_6_ch4_1.png"],
+    "故障排除":["images/SEESII_general/page_7_ch5_1.png"],
+    "保修服务":["images/SEESII_general/page_8_ch6_1.png"],
+    "废弃处理":[ "images/SEESII_general/page_9_ch7_1.png"],
+    "封底": ["images/SEESII_general/page_10_ch8_1.png"] 
+  },
+
+  "default": ["images/default-placeholder.png"]
+}
