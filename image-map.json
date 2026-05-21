@@ -20,5 +20,37 @@
     "封底": ["images/SEESII_general/page_10_ch8_1.png"] 
   },
 
+  "ScanningGun_EYOYO": {
+    "封面": ["images/ScanningGun_EYOYO/page_1_cover.png"],
+    "客户服务": ["images/ScanningGun_EYOYO/page_2.png"],
+    "目录": ["images/ScanningGun_EYOYO/page_3_cataloge.png"],
+    "使用说明": ["images/ScanningGun_EYOYO/page_4_ch1_1.png"], 
+    "功能说明与规格参数": [
+      "images/ScanningGun_EYOYO/page_5_ch2_1.png",
+      "images/ScanningGun_EYOYO/page_5_ch2_2.png"
+    ],
+    "产品介绍": ["images/ScanningGun_EYOYO/page_6_ch3_1.png"],
+    "产品菜单": [
+      "images/ScanningGun_EYOYO/page_7_ch4_1.png",
+      "images/ScanningGun_EYOYO/page_7_ch4_2.png",
+      "images/ScanningGun_EYOYO/page_7_ch4_3.png"
+    ],
+
+    "故障排查":[
+      "images/ScanningGun_EYOYO/page_8_ch5_1.png",
+      "images/ScanningGun_EYOYO/page_8_ch5_2.png"
+    ],
+    "充电说明":[
+      "images/ScanningGun_EYOYO/page_9_ch6_1.png",
+      "images/ScanningGun_EYOYO/page_9_ch6_2.png"
+    ],
+    "操作指南":[
+      "images/ScanningGun_EYOYO/page_10_ch7_1.png",
+      "images/ScanningGun_EYOYO/page_10_ch7_2.png",
+      "images/ScanningGun_EYOYO/page_10_ch7_3.png"
+    ]
+  },
+
+
   "default": ["images/default-placeholder.png"]
 }
